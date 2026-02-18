@@ -1,0 +1,17 @@
+# OpenClaw local state & secrets (do not commit)
+.openclaw/
+openclaw.json
+openclaw.json.bak*
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Logs & temp
+*.log
+.DS_Store
+
+# Optional: uncomment if you don't want to share workspace content
+# workspace/
