@@ -1,7 +1,33 @@
 {
+  "name": "open99-router",
+  "version": "2.0.0",
+  "description": "Strategic Multi-Model Router for OpenClaw with observability, cost tracking, and resilience",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "test": "jest --coverage",
+    "lint": "eslint src/**/*.ts",
+    "routing-log": "OPENCLAW_ROUTING_LOG=1 node dist/cli.js --type auto --prompt \"\""
+  },
+  "keywords": [
+    "openclaw",
+    "router",
+    "multi-model",
+    "openrouter"
+  ],
+  "author": "lalawgwg99 + UUZero",
+  "license": "MIT",
   "dependencies": {
     "dotenv": "^17.3.1",
-    "openai": "^6.22.0",
+    "openai": "^6.22.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.11.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

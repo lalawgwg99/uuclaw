@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Telegram 模型控制技能
-允許通過 Telegram 命令查看和切換模型
+Telegram 模型控制技能（含快取，省 API 呼叫）
 """
 
 import json
 import sys
+import time
 from pathlib import Path
+from functools import lru_cache
 
 # 添加父目錄到路徑以導入 model-manager
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "lib"))
@@ -14,14 +15,68 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "lib"))
 try:
     from model_manager import ModelManager
 except ImportError:
-    print("錯誤：無法導入 model_manager")
+    print("錯誤：無法导入 model_manager")
     print("請確保 lib/model-manager.py 存在")
     sys.exit(1)
 
 
+# ===== 快取層：記憶體 LRU + TTL =====
+class TimedCache:
+    def __init__(self, ttl_seconds=600, maxsize=128):
+        self.ttl = ttl_seconds
+        self.cache = {}
+        self.timestamps = {}
+        self.maxsize = maxsize
+
+    def get(self, key):
+        if key not in self.cache:
+            return None
+        if time.time() - self.timestamps[key] > self.ttl:
+            del self.cache[key]
+            del self.timestamps[key]
+            return None
+        # LRU: 更新時間
+        self.timestamps[key] = time.time()
+        return self.cache[key]
+
+    def set(self, key, value):
+        if len(self.cache) >= self.maxsize:
+            # 移除最久未使用的
+            oldest = min(self.timestamps, key=self.timestamps.get)
+            del self.cache[oldest]
+            del self.timestamps[oldest]
+        self.cache[key] = value
+        self.timestamps[key] = time.time()
+
+
+# 全域快取：模型列表與當前模型
+MODEL_CACHE = TimedCache(ttl_seconds=600, maxsize=32)  # 10 分鐘
+
+
+def cached_list_models(manager: ModelManager, provider=None):
+    """帶快取的 list_models"""
+    key = f"list_models:{provider or 'all'}"
+    cached = MODEL_CACHE.get(key)
+    if cached is not None:
+        return cached
+    result = manager.list_models(provider) if provider else manager.list_models()
+    MODEL_CACHE.set(key, result)
+    return result
+
+
+def cached_get_current_model(manager: ModelManager):
+    """帶快取的 get_current_model"""
+    cached = MODEL_CACHE.get("current_model")
+    if cached is not None:
+        return cached
+    result = manager.get_current_model()
+    MODEL_CACHE.set("current_model", result)
+    return result
+
+
 def handle_list_models(manager: ModelManager) -> str:
-    """處理列出模型命令"""
-    models = manager.list_models()
+    """處理列出模型命令（使用快取）"""
+    models = cached_list_models(manager)
     
     if not models:
         return "❌ 未找到任何模型"
@@ -52,11 +107,11 @@ def handle_list_models(manager: ModelManager) -> str:
 
 
 def handle_current_model(manager: ModelManager) -> str:
-    """處理查看當前模型命令"""
-    current = manager.get_current_model()
+    """處理查看當前模型命令（使用快取）"""
+    current = cached_get_current_model(manager)
     
-    # 嘗試獲取模型詳情
-    all_models = manager.list_models()
+    # 嘗試獲取模型詳情（這裡也快取）
+    all_models = cached_list_models(manager)
     model_info = None
     
     for model in all_models:
@@ -78,8 +133,8 @@ def handle_current_model(manager: ModelManager) -> str:
 def handle_switch_model(manager: ModelManager, model_id: str) -> str:
     """處理切換模型命令"""
     try:
-        # 檢查模型是否存在
-        all_models = manager.list_models()
+        # 檢查模型是否存在（使用快取）
+        all_models = cached_list_models(manager)
         model_exists = False
         model_info = None
         
@@ -102,6 +157,11 @@ def handle_switch_model(manager: ModelManager, model_id: str) -> str:
         
         manager.set_current_model(full_model_id)
         
+        # 切換後清除快取，確保下次讀取會取得最新狀態
+        MODEL_CACHE.cache.pop("current_model", None)
+        MODEL_CACHE.cache.pop("list_models:all", None)
+        MODEL_CACHE.cache.pop(f"list_models:{provider}", None)
+        
         response = "✅ 模型已切換\n\n"
         response += f"新模型: {model_info.get('name', 'Unknown')}\n"
         response += f"ID: {full_model_id}\n"
@@ -115,9 +175,9 @@ def handle_switch_model(manager: ModelManager, model_id: str) -> str:
 
 
 def handle_free_models(manager: ModelManager) -> str:
-    """處理查看免費模型命令"""
+    """處理查看免費模型命令（使用快取）"""
     # 查找 openrouter-free 提供者的模型
-    models = manager.list_models("openrouter-free")
+    models = cached_list_models(manager, "openrouter-free")
     
     if not models:
         return "❌ 未找到免費模型\n\n請先運行免費模型更新器"

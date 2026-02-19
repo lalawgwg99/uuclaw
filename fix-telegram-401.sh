@@ -6,23 +6,33 @@ set -e
 echo "🔧 修復 Telegram 401 錯誤..."
 echo ""
 
-CONFIG_FILE="/Users/jazzxx/Desktop/OpenClaw/.openclaw/openclaw.json"
+# 修復兩個配置文件
+CONFIG_FILE1="/Users/jazzxx/Desktop/OpenClaw/openclaw.json"
+CONFIG_FILE2="/Users/jazzxx/Desktop/OpenClaw/.openclaw/openclaw.json"
 
-# 備份當前配置
-cp "$CONFIG_FILE" "${CONFIG_FILE}.backup-$(date +%Y%m%d-%H%M%S)"
-
-# 修復配置：使用 pairing 模式
-echo "📝 設置 dmPolicy 為 pairing..."
-jq '.channels.telegram.dmPolicy = "pairing" | del(.channels.telegram.allowFrom)' "$CONFIG_FILE" > /tmp/config-fix.json
-mv /tmp/config-fix.json "$CONFIG_FILE"
-
-echo "✓ 配置已修復"
-echo ""
-
-# 顯示當前配置
-echo "📋 當前 Telegram 配置："
-jq '.channels.telegram' "$CONFIG_FILE"
-echo ""
+for CONFIG_FILE in "$CONFIG_FILE1" "$CONFIG_FILE2"; do
+    if [ -f "$CONFIG_FILE" ]; then
+        echo "📝 修復配置：$CONFIG_FILE"
+        
+        # 備份當前配置
+        cp "$CONFIG_FILE" "${CONFIG_FILE}.backup-$(date +%Y%m%d-%H%M%S)"
+        
+        # 修復配置：使用 pairing 模式，移除無效鍵
+        jq '.channels.telegram.dmPolicy = "pairing" | 
+            del(.channels.telegram.allowFrom) | 
+            del(.channels.telegram.requireMention) | 
+            del(.channels.telegram.tts)' "$CONFIG_FILE" > /tmp/config-fix.json
+        mv /tmp/config-fix.json "$CONFIG_FILE"
+        
+        echo "✓ 配置已修復"
+        echo ""
+        
+        # 顯示當前配置
+        echo "📋 當前 Telegram 配置："
+        jq '.channels.telegram' "$CONFIG_FILE"
+        echo ""
+    fi
+done
 
 # 重啟 OpenClaw
 echo "🔄 重啟 OpenClaw..."

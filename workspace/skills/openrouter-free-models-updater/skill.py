@@ -19,11 +19,29 @@ except ImportError:
 
 
 def fetch_free_models():
-    """從 OpenRouter API 獲取免費模型列表"""
+    """從 OpenRouter API 獲取免費模型列表（帶快取，節省 API 呼叫與 token）"""
+    import time
+    cache_path = Path.home() / ".openclaw" / "free-models-cache.json"
+    cache_ttl_ms = 60 * 60 * 1000  # 1 小時
+
+    # 嘗試讀取快取
+    try:
+        if cache_path.exists():
+            with open(cache_path, 'r', encoding='utf-8') as f:
+                cache = json.load(f)
+            last_check_ts = datetime.fromisoformat(cache.get("last_check", "")).timestamp() * 1000
+            if (time.time() * 1000 - last_check_ts) < cache_ttl_ms:
+                models = cache.get("models", [])
+                print(f"[cache] 使用免費模型快取（{len(models)} 個模型，TTL 剩餘 {int((cache_ttl_ms - (time.time()*1000 - last_check_ts))/60000)} 分）")
+                return models
+    except Exception as e:
+        print(f"[cache] 讀取快取失敗：{e}，將重新取得")
+
+    # 若無快取或快取過期，從 API 取得
+    print("[cache] 快取未命中，正在從 OpenRouter 獲取最新模型列表...")
     url = "https://openrouter.ai/api/v1/models"
     
     try:
-        print("正在從 OpenRouter 獲取模型列表...")
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         
@@ -44,7 +62,18 @@ def fetch_free_models():
                     "contextWindow": model.get("context_length", 128000)
                 })
         
-        print(f"找到 {len(free_models)} 個免費模型")
+        print(f"[cache] 取得 {len(free_models)} 個免費模型，寫入快取")
+        # 保存快取
+        try:
+            cache_data = {
+                "last_check": datetime.now().isoformat(),
+                "models": free_models
+            }
+            with open(cache_path, 'w', encoding='utf-8') as f:
+                json.dump(cache_data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"[cache] 寫入快取失敗：{e}")
+        
         return free_models
     
     except requests.RequestException as e:

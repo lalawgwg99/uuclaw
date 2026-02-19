@@ -199,3 +199,73 @@ openclaw config set env.OPENROUTER_API_KEY "your-new-key"
 ✅ 完整的管理工具和文檔
 
 **現在可以放心使用，不用擔心燒錢了！** 🎉
+
+
+## 問題排查記錄
+
+### Telegram 401 錯誤 (已解決)
+**問題**: 發送訊息到 @UUZeroBot 時收到 "HTTP 401: User not found" 錯誤
+
+**根本原因**:
+1. OpenClaw 有兩個配置檔案:
+   - `/Users/jazzxx/Desktop/OpenClaw/openclaw.json` (gateway 使用)
+   - `~/.openclaw/openclaw.json` (用戶配置)
+2. 兩個檔案的 `dmPolicy` 設定不一致
+3. 配置檔案包含無效的鍵值導致解析錯誤
+
+**解決方案**:
+1. 統一兩個配置檔案的 Telegram 設定:
+   ```json
+   {
+     "channels": {
+       "telegram": {
+         "enabled": true,
+         "dmPolicy": "allowlist",
+         "allowFrom": ["5058792327"],
+         "botToken": "8241729786:AAFSGGLYOsEHXI28PBQwZ50-JqNzx-1voo4"
+       }
+     }
+   }
+   ```
+2. 移除無效的配置鍵 (`whitelist`, `llm`, `session`, `agentToAgent`, `tools`, `heartbeat.quiet`)
+3. 重啟 gateway
+
+### 模型限流問題 (已解決)
+**問題**: Agent 處理訊息時一直失敗 (`isError=true`)
+
+**根本原因**: 
+免費模型 `qwen/qwen3-coder:free` 被 OpenRouter 臨時限流:
+```
+qwen/qwen3-coder:free is temporarily rate-limited upstream
+```
+
+**解決方案**:
+切換到另一個穩定的免費模型 `google/gemini-2.0-flash-lite-preview:free`
+
+### 驗證步驟
+1. 檢查 gateway 狀態:
+   ```bash
+   ps aux | grep openclaw
+   ```
+
+2. 檢查配置:
+   ```bash
+   cat /Users/jazzxx/Desktop/OpenClaw/openclaw.json | jq '.channels.telegram'
+   ```
+
+3. 測試 Telegram:
+   發送訊息到 @UUZeroBot
+
+4. 監控日誌:
+   ```bash
+   tail -f /tmp/openclaw/openclaw-2026-02-19.log | grep telegram
+   ```
+
+## 下一步建議
+
+1. 測試 Telegram Bot 功能
+2. 如果 Gemini 也被限流，可以切換到其他免費模型:
+   - `stepfun/step-3.5-flash:free`
+   - `arcee-ai/trinity-large-preview:free`
+3. 考慮設置多個免費模型作為 fallback
+4. 監控每日 8:00 AM 的免費模型檢查任務

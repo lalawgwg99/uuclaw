@@ -1,103 +1,103 @@
+#!/usr/bin/env node
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 const router_1 = require("./router");
-const dotenv = __importStar(require("dotenv"));
-dotenv.config();
-const apiKey = process.env.OPENROUTER_API_KEY;
-if (!apiKey) {
-    console.error("Error: OPENROUTER_API_KEY is not set.");
-    process.exit(1);
-}
-const router = new router_1.ClawRouter(apiKey);
+const config_1 = require("./config");
 async function main() {
+    const config = (0, config_1.loadConfig)();
+    const router = new router_1.ClawRouter(config);
     const args = process.argv.slice(2);
     let taskType = 'auto';
     let prompt = "";
     let context = "";
     let schema = "";
-    // One-click: reason_strict → DeepSeek V3.2 for this run
+    let outputJson = false;
     if (args.includes("--reason-strict-deepseek")) {
         process.env.OPENCLAW_REASON_STRICT_DEEPSEEK = "1";
     }
-    // Simple flag parser; tools will call this with explicit flags
     for (let i = 0; i < args.length; i++) {
         const arg = args[i];
-        if (arg === '--type') {
-            const type = args[++i];
-            if (type === 'chat' || type === 'reason' || type === 'tool' || type === 'auto')
-                taskType = type;
-        }
-        else if (arg === '--prompt') {
-            prompt = args[++i] || "";
-        }
-        else if (arg === '--context') {
-            context = args[++i] || "";
-        }
-        else if (arg === '--schema') {
-            schema = args[++i] || "";
+        switch (arg) {
+            case '--type':
+                const type = args[++i];
+                if (['chat', 'reason', 'tool', 'auto'].includes(type)) {
+                    taskType = type;
+                }
+                break;
+            case '--prompt':
+                prompt = args[++i] || "";
+                break;
+            case '--context':
+                context = args[++i] || "";
+                break;
+            case '--schema':
+                schema = args[++i] || "";
+                break;
+            case '--debug-route':
+                config.logging.debugRoute = true;
+                break;
+            case '--routing-log':
+                const logPath = args[++i];
+                config.logging.routingLog = true;
+                config.logging.routingLogPath = logPath;
+                break;
+            case '--json':
+                outputJson = true;
+                break;
         }
     }
     if (!prompt) {
-        console.error("Usage: node cli.js --type <type> --prompt <prompt> [--context <ctx>] [--schema <sch>]");
-        process.exit(1); // Fail gracefully but exit 1 to indicate error
+        console.error("Usage: open99-router --type <type> --prompt \"<prompt>\" [--context <ctx>] [--schema <sch>] [--debug-route] [--routing-log <path>] [--json]");
+        process.exit(1);
     }
-    // Combine inputs based on logic requested by user ("Hub-and-Spoke" Skill logic)
-    // The Skill definition passes structured params; here we merge them into the prompt for the Router.
     let finalPrompt = prompt;
     if (taskType === 'reason' && context) {
-        finalPrompt = `Context Summary:\n${context}\n\nTask:\n${prompt}`;
+        finalPrompt = `Context:\n${context}\n\nTask:\n${prompt}`;
     }
     else if (taskType === 'tool' && schema) {
-        finalPrompt = `Schema Requirement:\n${schema}\n\nInput Data:\n${prompt}`;
+        finalPrompt = `Schema:\n${schema}\n\nInput:\n${prompt}`;
     }
     try {
+        const start = Date.now();
         const stream = taskType === 'auto'
             ? await router.autoRoute(finalPrompt)
             : await router.route(taskType, finalPrompt);
+        let fullOutput = "";
         for await (const chunk of stream) {
             const content = chunk.choices[0]?.delta?.content;
             if (content) {
                 process.stdout.write(content);
+                fullOutput += content;
             }
         }
-        process.stdout.write("\n");
+        const latency = Date.now() - start;
+        const tokensInput = Math.ceil(finalPrompt.length / 4);
+        const tokensOutput = Math.ceil(fullOutput.length / 4);
+        router.recordCost(taskType === 'auto' ? config.defaultModel : taskType === 'reason' ? 'stepfun/step-3.5-flash:free'
+            : taskType === 'tool' ? 'arcee-ai/trinity-large-preview:free'
+                : 'minimax/minimax-m2.5', tokensInput, tokensOutput);
+        if (outputJson) {
+            const report = {
+                taskType,
+                latencyMs: latency,
+                tokensInput,
+                tokensOutput,
+                estimatedCostUSD: router.getSessionCost(),
+                model: config.defaultModel
+            };
+            console.error("\n--- METRICS ---");
+            console.error(JSON.stringify(report, null, 2));
+        }
+        else {
+            console.error(`\n[metrics] latency=${latency}ms tokens=${tokensInput}+${tokensOutput} cost=$${router.getSessionCost().toFixed(6)}`);
+        }
     }
     catch (error) {
-        console.error("Execution failed:", error);
+        console.error("Execution failed:", error.message);
         process.exit(1);
+    }
+    finally {
+        router.close();
     }
 }
 main();

@@ -5,128 +5,223 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ClawRouter = void 0;
 const openai_1 = __importDefault(require("openai"));
-const prompts_1 = require("./prompts");
-// Model Definitions (4-model combo + REASON_STRICT override)
-// Model Definitions (Unified per user request)
-const MODELS = {
-    MAIN_BRAIN: "google/gemini-2.5-flash-lite-preview-09-2025",
-    VISION: "google/gemini-2.5-flash-lite-preview-09-2025",
-    STRATEGY_UNIT: "google/gemini-2.5-flash-lite-preview-09-2025",
-    LOGIC_UNIT: "google/gemini-2.5-flash-lite-preview-09-2025",
-    REASON_STRICT: "google/gemini-2.5-flash-lite-preview-09-2025",
-    TOOL_WORKER: "google/gemini-2.5-flash-lite-preview-09-2025"
-};
-// Env: OPENCLAW_REASON_STRICT_DEEPSEEK=1 → use DeepSeek V3.2 for reason_strict; else Step Flash
-
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
+const logger_1 = require("./logger");
+const inference_1 = require("./inference");
+const circuit_1 = require("./circuit");
+const health_1 = require("./health");
+const cost_1 = require("./cost");
 class ClawRouter {
-    constructor(apiKey) {
-        if (!apiKey)
-            throw new Error("FATAL: OpenRouter API Key is missing.");
-        // Initialize OpenAI client pointing to OpenRouter
+    constructor(config, apiKey) {
+        this.config = config;
+        this.logger = new logger_1.Logger(config);
+        this.inference = new inference_1.TaskInference(config.inference);
+        this.circuitBreakers = new Map();
+        this.healthMonitors = new Map();
+        this.costTracker = new cost_1.CostTracker(config.models);
+        const key = apiKey || process.env.OPENROUTER_API_KEY;
+        if (!key) {
+            throw new Error("FATAL: OpenRouter API Key is missing (OPENROUTER_API_KEY).");
+        }
         this.client = new openai_1.default({
             baseURL: "https://openrouter.ai/api/v1",
-            apiKey: apiKey,
+            apiKey: key,
             defaultHeaders: {
-                "HTTP-Referer": "https://openclaw.ai", // Required by OpenRouter
+                "HTTP-Referer": "https://openclaw.ai",
                 "X-Title": "OpenClaw"
             }
         });
     }
-    inferTaskType(prompt) {
-        const text = (prompt || "");
-        const lower = text.toLowerCase();
-        const length = text.length;
-        if (length < 40)
-            return "chat";
-        // Detect Vision/Image request keywords
-        if (lower.includes("image") || lower.includes("photo") || lower.includes("picture") || lower.includes("screenshot") || lower.includes("看圖") || lower.includes("分析這張"))
-            return "vision";
-        if (length > 80 && /[{}\[\]]/.test(text) && lower.includes("json"))
-            return "tool";
-        if (length > 80 && (lower.includes("schema:") || lower.includes("schema requirement")))
-            return "tool";
-        // Hard override: strict reasoning keywords → reason_strict (Step or DeepSeek by env)
-        const strictKeywords = ["證明", "反證", "最小化", "最佳化", "複雜度", "嚴格", "formal"];
-        if (strictKeywords.some((k) => text.includes(k) || lower.includes(k)))
-            return "reason_strict";
-        const zhReason = ["為什麼", "推理", "分析", "步驟", "一步一步", "深入思考", "架構設計", "優缺點", "取捨"];
-        if (length > 80 && zhReason.some((k) => text.includes(k)))
-            return "reason";
-        const enReason = ["reason step by step", "step by step", "analyze", "analysis", "design an architecture", "architecture design", "trade-offs", "pros and cons"];
-        if (length > 80 && enReason.some((k) => lower.includes(k)))
-            return "reason";
-        return "chat";
-    }
     async autoRoute(prompt, systemContext) {
-        const inferred = this.inferTaskType(prompt);
-        console.error("\x1b[35m[ROUTER] Auto-selected task type: " + inferred + "\x1b[0m");
+        const inferred = this.inference.inferTaskType(prompt);
+        this.logger.debug(`Inferred task type: ${inferred} from prompt length ${prompt.length}`);
         return this.route(inferred, prompt, systemContext);
     }
-    /**
-     * Core routing function: Selects model and system prompt based on task type.
-     */
     async route(taskType, prompt, systemContext) {
-        let modelId = MODELS.MAIN_BRAIN;
-        let temperature = 0.7;
-        let systemPrompt = prompts_1.PROMPT_MAIN;
-        // Switch model configuration based on task type
-        switch (taskType) {
-            case 'vision':
-                modelId = MODELS.VISION;
-                temperature = 0.3;
-                systemPrompt = prompts_1.PROMPT_VISION;
-                console.error(`\x1b[36m[ROUTER] Vision Mode (${modelId})...\x1b[0m`);
-                break;
-            case 'reason_strict':
-                modelId = MODELS.REASON_STRICT;
-                temperature = 0.5;
-                systemPrompt = prompts_1.PROMPT_LOGIC;
-                console.error("\x1b[33m[ROUTER] REASON_STRICT → " + modelId + "\x1b[0m");
-                break;
-            case 'reason':
-                modelId = MODELS.LOGIC_UNIT;
-                temperature = 0.6;
-                systemPrompt = prompts_1.PROMPT_LOGIC;
-                console.error("\x1b[33m[ROUTER] Logic Unit (" + modelId + ") for deep thinking...\x1b[0m");
-                break;
-            case 'tool':
-                modelId = MODELS.TOOL_WORKER;
-                temperature = 0.1; // Tool execution requires precision
-                systemPrompt = prompts_1.PROMPT_TOOL;
-                console.error(`\x1b[36m[ROUTER] Switching to Tool Worker (${modelId}) for execution...\x1b[0m`);
-                break;
-            default:
-                console.error(`\x1b[32m[ROUTER] Using Main Brain (${modelId})...\x1b[0m`);
-                // Use user provided system context if available, otherwise default main prompt
-                if (systemContext)
-                    systemPrompt = systemContext;
-                break;
+        const start = Date.now();
+        let modelId = this.selectModel(taskType);
+        let temperature = this.getTemperature(taskType);
+        let systemPrompt = this.getSystemPrompt(taskType, systemContext);
+        // Register circuit & health if first time
+        if (!this.circuitBreakers.has(modelId)) {
+            this.circuitBreakers.set(modelId, new circuit_1.CircuitBreaker(this.config.circuitBreaker));
+        }
+        if (!this.healthMonitors.has(modelId)) {
+            this.healthMonitors.set(modelId, new health_1.HealthMonitor(this.config.healthCheck));
+        }
+        const breaker = this.circuitBreakers.get(modelId);
+        const health = this.healthMonitors.get(modelId);
+        // Dynamic weighting: if health is poor, penalize and potentially switch
+        if (this.config.healthCheck.dynamicWeighting && !health.isHealthy()) {
+            const penalty = health.getWeightPenalty();
+            this.logger.debug(`Health penalty for ${modelId}: ${penalty.toFixed(2)} (successRate=${health.getSuccessRate().toFixed(2)})`);
+            // If penalty is severe, consider fallback
+            if (penalty < 0.5) {
+                const fallback = this.selectFallback(modelId, taskType);
+                if (fallback) {
+                    this.logger.fallback(modelId, fallback);
+                    modelId = fallback;
+                    // Reset breaker/health for new model
+                    if (!this.circuitBreakers.has(modelId)) {
+                        this.circuitBreakers.set(modelId, new circuit_1.CircuitBreaker(this.config.circuitBreaker));
+                    }
+                    if (!this.healthMonitors.has(modelId)) {
+                        this.healthMonitors.set(modelId, new health_1.HealthMonitor(this.config.healthCheck));
+                    }
+                }
+            }
         }
         const messages = [
             { role: "system", content: systemPrompt },
             { role: "user", content: prompt }
         ];
         try {
-            const stream = await this.client.chat.completions.create({
+            const stream = await breaker.execute(() => this.client.chat.completions.create({
                 model: modelId,
-                messages: messages,
+                messages: messages, // type assertion for simplicity
                 temperature: temperature,
-                stream: true
+                stream: true,
+                max_tokens: 4096 // Fixed to safe default; override per-model from config if needed
+            }));
+            // Success: record health
+            const latency = Date.now() - start;
+            health.recordSuccess(latency);
+            this.logger.route(modelId, taskType, 'routed');
+            this.logger.logRouting({
+                ts: new Date().toISOString(),
+                taskType,
+                inputLength: prompt.length,
+                matchedKeywords: [],
+                modelSelected: modelId,
+                latencyMs: latency
             });
             return stream;
         }
         catch (error) {
-            console.error("\x1b[31m[ERROR] " + modelId + " failed:\x1b[0m", error);
-            if (modelId === MODELS.REASON_STRICT) {
-                console.error("\x1b[31m[FALLBACK] REASON_STRICT failed → trying Logic Unit (Step)...\x1b[0m");
-                return this.route("reason", prompt, systemContext);
+            const latency = Date.now() - start;
+            health.recordFailure(latency);
+            // Classify error for smarter fallback
+            const errorType = this.classifyError(error);
+            this.logger.error(modelId, error);
+            this.logger.logRouting({
+                ts: new Date().toISOString(),
+                taskType,
+                inputLength: prompt.length,
+                matchedKeywords: [],
+                modelSelected: modelId,
+                fallbackUsed: true,
+                fallbackFrom: modelId,
+                errorType,
+                latencyMs: latency
+            });
+            // Circuit breaker will handle retry logic partially; we implement manual fallback chain
+            if (taskType === 'reason_strict' || taskType === 'reason') {
+                // For reason_strict: fallback to reason (Step if using DeepSeek, otherwise DeepSeek if using Step? Actually step config)
+                const fallback = this.config.fallbacks[0] || 'stepfun/step-3.5-flash:free';
+                this.logger.fallback(modelId, fallback);
+                return this.route('reason', prompt, systemContext); // recursive fallback
             }
-            if (modelId !== MODELS.MAIN_BRAIN) {
-                console.error("\x1b[31m[FALLBACK] Attempting fallback to Main Brain...\x1b[0m");
-                return this.route("chat", prompt, systemContext);
+            else {
+                // fallback to main brain (MiniMax) or chat
+                const fallback = this.config.defaultModel;
+                this.logger.fallback(modelId, fallback);
+                return this.route('chat', prompt, systemContext);
             }
-            throw error;
         }
+    }
+    selectModel(taskType) {
+        // In a real system we could have separate model mapping per task type; for now use default
+        // But we can also use dynamic weighting: choose best health among possible candidates
+        const candidates = this.getCandidatesForTask(taskType);
+        if (candidates.length === 0)
+            return this.config.defaultModel;
+        // Pick the first healthy candidate, else first
+        for (const cid of candidates) {
+            const health = this.healthMonitors.get(cid);
+            if (!health || health.isHealthy()) {
+                return cid;
+            }
+        }
+        return candidates[0];
+    }
+    getCandidatesForTask(taskType) {
+        switch (taskType) {
+            case 'reason_strict':
+                return [this.config.models['deepseek/deepseek-v3.2']?.id || 'deepseek/deepseek-v3.2',
+                    this.config.models['stepfun/step-3.5-flash:free']?.id || 'stepfun/step-3.5-flash:free'];
+            case 'reason':
+                return [this.config.models['stepfun/step-3.5-flash:free']?.id || 'stepfun/step-3.5-flash:free'];
+            case 'tool':
+                return [this.config.models['arcee-ai/trinity-large-preview:free']?.id || 'arcee-ai/trinity-large-preview:free'];
+            case 'chat':
+            default:
+                return [this.config.models['minimax/minimax-m2.5']?.id || 'minimax/minimax-m2.5'];
+        }
+    }
+    selectFallback(currentModel, taskType) {
+        // Simple round-robin or based on type; not used now
+        const idx = this.config.fallbacks.findIndex(m => m === currentModel);
+        if (idx >= 0 && idx + 1 < this.config.fallbacks.length) {
+            return this.config.fallbacks[idx + 1];
+        }
+        return this.config.fallbacks[0] || null;
+    }
+    getTemperature(taskType) {
+        switch (taskType) {
+            case 'reason_strict':
+            case 'reason':
+                return 0.5;
+            case 'tool':
+                return 0.1;
+            default:
+                return 0.7;
+        }
+    }
+    getSystemPrompt(taskType, systemContext) {
+        // Placeholder: merge prompts based on type; currently from original prompts module
+        const prompts = {
+            chat: `You are OpenClaw, a sentient Coordinator. Professional but gritty.`,
+            reason: `You are the LOGIC CORE. TRUTH and ACCURACY only. Chain of thought, no fluff.`,
+            reason_strict: `You are the LOGIC CORE (strict). Red teaming. Data integrity.`,
+            tool: `You are the EXECUTION ENGINE. Output VALID JSON ONLY.`
+        };
+        return systemContext || prompts[taskType] || prompts.chat;
+    }
+    classifyError(error) {
+        if (error.response) {
+            const status = error.response.status;
+            if (status === 429)
+                return 'rate_limit';
+            if (status >= 500 && status < 600)
+                return 'server_error';
+            if (status === 401)
+                return 'auth_error';
+            if (status === 400)
+                return 'bad_request';
+        }
+        if (error.code === 'ECONNABORTED')
+            return 'timeout';
+        return 'unknown';
+    }
+    // Expose for external token counting
+    estimateCost(modelId, tokensInput, tokensOutput) {
+        return this.costTracker.estimateCost(modelId, tokensInput, tokensOutput);
+    }
+    recordCost(modelId, tokensInput, tokensOutput) {
+        this.costTracker.record(modelId, tokensInput, tokensOutput);
+    }
+    getSessionCost() {
+        return this.costTracker.getSessionCost();
+    }
+    getModelCostBreakdown() {
+        return this.costTracker.getModelBreakdown();
+    }
+    getGrandTotalCost() {
+        return this.costTracker.getGrandTotal();
+    }
+    close() {
+        this.logger.close();
     }
 }
 exports.ClawRouter = ClawRouter;
