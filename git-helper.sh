@@ -95,13 +95,21 @@ git_push() {
     echo -e "${YELLOW}推送到 GitHub...${NC}"
     
     # 使用 token 進行認證
-    git push https://${GITHUB_TOKEN}@github.com/lalawgwg99/uuzero.git
+    git push https://${GITHUB_TOKEN}@github.com/lalawgwg99/uuzero1.git main
     
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✅ 成功推送到 GitHub${NC}"
+    # 如果推送失敗，嘗試 force push
+    if [ $? -ne 0 ]; then
+        echo -e "${YELLOW}⚠️  普通推送失敗，嘗試 force push...${NC}"
+        git push https://${GITHUB_TOKEN}@github.com/lalawgwg99/uuzero1.git main --force
+        
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✅ Force push 成功${NC}"
+        else
+            echo -e "${RED}❌ 推送失敗${NC}"
+            exit 1
+        fi
     else
-        echo -e "${RED}❌ 推送失敗${NC}"
-        exit 1
+        echo -e "${GREEN}✅ 成功推送到 GitHub${NC}"
     fi
 }
 
@@ -109,7 +117,7 @@ git_push() {
 git_pull() {
     echo -e "${YELLOW}從 GitHub 拉取...${NC}"
     
-    git pull https://${GITHUB_TOKEN}@github.com/lalawgwg99/uuzero.git
+    git pull https://${GITHUB_TOKEN}@github.com/lalawgwg99/uuzero1.git main --rebase
     
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✅ 成功從 GitHub 拉取${NC}"

@@ -13,7 +13,7 @@ GITHUB_TOKEN="your_github_token_here"
 ### Git 用戶配置
 - **用戶名**：lalawgwg99
 - **郵箱**：lalawgwg99@users.noreply.github.com
-- **倉庫**：https://github.com/lalawgwg99/uuzero
+- **倉庫**：https://github.com/lalawgwg99/uuzero1
 
 ## 🚀 快速操作命令
 
