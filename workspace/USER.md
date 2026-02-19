@@ -17,7 +17,7 @@ _Learn about the person you're helping. Update this as you go._
 - **Philosophy:** "Hub-and-Spoke".
 - **Communication:** Direct, Efficient, No fluff.
 - **Environment:** Pure Node.js (Mac mini).
-- **Current Focus:** Optimizing multi-agent architecture (MiniMax + DeepSeek + Llama).
+- **Current Focus:** Optimizing multi-agent architecture (Gemini + DeepSeek + Llama).
 
 ### 🚫 Anti-Patterns (What annoys them)
 

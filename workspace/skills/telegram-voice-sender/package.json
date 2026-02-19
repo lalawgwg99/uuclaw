@@ -1,0 +1,6 @@
+{
+  "name": "telegram-voice-sender",
+  "version": "1.0.0",
+  "description": "發送語音到 Telegram 的 Agent Skill",
+  "main": "index.js"
+}

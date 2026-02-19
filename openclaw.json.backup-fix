@@ -1,0 +1,152 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.2.15",
+    "lastTouchedAt": "2026-02-18T11:20:00Z"
+  },
+  "whitelist": [
+    "google/gemini-2.5-flash-lite-preview-09-2025",
+    "minimax/minimax-m2.5",
+    "arcee-ai/trinity-large-preview:free",
+    "stepfun/step-3.5-flash:free"
+  ],
+  "llm": {
+    "provider": "openrouter",
+    "model": "google/gemini-2.5-flash-lite-preview-09-2025",
+    "whitelist": [
+      "google/gemini-2.5-flash-lite-preview-09-2025",
+      "minimax/minimax-m2.5",
+      "arcee-ai/trinity-large-preview:free",
+      "stepfun/step-3.5-flash:free"
+    ]
+  },
+  "env": {
+    "OPENROUTER_API_KEY": "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",
+    "BRAVE_API_KEY": "BSAaM2mUBp7y_sWGfxI0xQgAC3uSCDy"
+  },
+  "messages": {
+    "ackReaction": "👀",
+    "ackReactionScope": "all"
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openrouter/google/gemini-2.5-flash-lite-preview-09-2025",
+        "fallbacks": [
+          "openrouter/minimax/minimax-m2.5"
+        ]
+      },
+      "models": {
+        "google/gemini-2.5-flash-lite-preview-09-2025": {
+          "alias": "gemini"
+        },
+        "minimax/minimax-m2.5": {
+          "alias": "minimax"
+        },
+        "arcee-ai/trinity-large-preview:free": {
+          "alias": "trinity"
+        },
+        "stepfun/step-3.5-flash:free": {
+          "alias": "step"
+        }
+      },
+      "heartbeat": {
+        "every": "30m",
+        "model": "google/gemini-2.5-flash-lite-preview-09-2025",
+        "target": "last"
+      },
+      "subagents": {
+        "model": "arcee-ai/trinity-large-preview:free",
+        "maxConcurrent": 2,
+        "archiveAfterMinutes": 60
+      },
+      "session": {
+        "dmScope": "per-account-channel-peer"
+      },
+      "agentToAgent": {
+        "maxPingPong": 0
+      }
+    },
+    "main": {
+      "workspace": "/Users/jazzxx/Desktop/OpenClaw/workspace-main",
+      "model": {
+        "primary": "openrouter/google/gemini-2.5-flash-lite-preview-09-2025"
+      }
+    },
+    "engineer": {
+      "workspace": "/Users/jazzxx/Desktop/OpenClaw/workspace-engineer",
+      "model": {
+        "primary": "openrouter/minimax/minimax-m2.5"
+      }
+    },
+    "creator": {
+      "workspace": "/Users/jazzxx/Desktop/OpenClaw/workspace-creator",
+      "model": {
+        "primary": "openrouter/stepfun/step-3.5-flash:free"
+      }
+    },
+    "analyst": {
+      "workspace": "/Users/jazzxx/Desktop/OpenClaw/workspace-analyst",
+      "model": {
+        "primary": "openrouter/arcee-ai/trinity-large-preview:free"
+      }
+    }
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "bash": true,
+    "config": true,
+    "debug": true
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "dmPolicy": "open",
+      "groupPolicy": "allowlist",
+      "allowFrom": [
+        "*"
+      ],
+      "botToken": "8241729786:AAFSGGLYOsEHXI28PBQwZ50-JqNzx-1voo4",
+      "streamMode": "partial",
+      "reactionLevel": "ack",
+      "requireMention": false
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "bind": "loopback",
+    "auth": {
+      "mode": "token",
+      "token": "c5406226a77bc9ac7b4839cd2908775eadf874ac18da2355"
+    }
+  },
+  "plugins": {
+    "entries": {
+      "telegram": {
+        "enabled": true
+      }
+    }
+  },
+  "bindings": [
+    {
+      "channel": "telegram",
+      "accountId": "main",
+      "agentId": "main"
+    },
+    {
+      "channel": "telegram",
+      "accountId": "engineer",
+      "agentId": "engineer"
+    },
+    {
+      "channel": "telegram",
+      "accountId": "creator",
+      "agentId": "creator"
+    },
+    {
+      "channel": "telegram",
+      "accountId": "analyst",
+      "agentId": "analyst"
+    }
+  ]
+}

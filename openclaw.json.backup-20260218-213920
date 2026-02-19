@@ -1,0 +1,86 @@
+{
+  "meta": {
+    "lastTouchedVersion": "2026.2.15",
+    "lastTouchedAt": "2026-02-18T11:20:00Z"
+  },
+  "whitelist": [
+    "google/gemini-2.5-flash-lite-preview-09-2025",
+    "minimax/minimax-m2.5"
+  ],
+  "llm": {
+    "provider": "openrouter",
+    "model": "google/gemini-2.5-flash-lite-preview-09-2025",
+    "whitelist": [
+      "google/gemini-2.5-flash-lite-preview-09-2025",
+      "minimax/minimax-m2.5"
+    ]
+  },
+  "env": {
+    "OPENROUTER_API_KEY": "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",
+    "BRAVE_API_KEY": "BSAaM2mUBp7y_sWGfxI0xQgAC3uSCDy"
+  },
+  "messages": {
+    "ackReaction": "👀",
+    "ackReactionScope": "all"
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "openrouter/google/gemini-2.5-flash-lite-preview-09-2025"
+      },
+      "imageModel": {
+        "primary": "openrouter/google/gemini-2.5-flash-lite-preview-09-2025"
+      },
+      "workspace": "/Users/jazzxx/Desktop/OpenClaw/workspace",
+      "elevatedDefault": "full",
+      "compaction": {
+        "mode": "default"
+      },
+      "tools": {
+        "elevated": {
+          "enabled": true,
+          "allowFrom": {
+            "all": [
+              "*"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "bash": true,
+    "config": true,
+    "debug": true
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "dmPolicy": "open",
+      "allowFrom": [
+        "*"
+      ],
+      "botToken": "8241729786:AAFSGGLYOsEHXI28PBQwZ50-JqNzx-1voo4",
+      "groupPolicy": "allowlist",
+      "streamMode": "partial",
+      "reactionLevel": "ack"
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "bind": "loopback",
+    "auth": {
+      "mode": "token",
+      "token": "c5406226a77bc9ac7b4839cd2908775eadf874ac18da2355"
+    }
+  },
+  "plugins": {
+    "entries": {
+      "telegram": {
+        "enabled": true
+      }
+    }
+  }
+}

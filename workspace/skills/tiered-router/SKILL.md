@@ -25,7 +25,7 @@ Description: A unified interface to access specialized AI models (Logic Unit, To
 
 ## `router.chat`
 
-- **Description**: 使用 **MiniMax M2.5** (Main Brain) 標準對話。無特殊處理的交互，或 reason/tool 失敗時的 Fallback。
+- **Description**: 使用 **Gemini 2.5 Flash Lite** (Main Brain) 標準對話。無特殊處理的交互，或 reason/tool 失敗時的 Fallback。
 - **Parameters**:
   - `prompt` (string, required): 對話內容。
 - **Command**: `node /Users/jazzxx/Desktop/OpenClaw/modules/router/dist/cli.js --type chat --prompt "{{prompt}}"`

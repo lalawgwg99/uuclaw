@@ -7,17 +7,17 @@ exports.ClawRouter = void 0;
 const openai_1 = __importDefault(require("openai"));
 const prompts_1 = require("./prompts");
 // Model Definitions (4-model combo + REASON_STRICT override)
+// Model Definitions (Unified per user request)
 const MODELS = {
-    MAIN_BRAIN: "minimax/minimax-m2.5",
-    LOGIC_UNIT: "stepfun/step-3.5-flash:free",
-    REASON_STRICT: "deepseek/deepseek-v3.2",
-    TOOL_WORKER: "arcee-ai/trinity-large-preview:free"
+    MAIN_BRAIN: "google/gemini-2.5-flash-lite-preview-09-2025",
+    VISION: "google/gemini-2.5-flash-lite-preview-09-2025",
+    STRATEGY_UNIT: "google/gemini-2.5-flash-lite-preview-09-2025",
+    LOGIC_UNIT: "google/gemini-2.5-flash-lite-preview-09-2025",
+    REASON_STRICT: "google/gemini-2.5-flash-lite-preview-09-2025",
+    TOOL_WORKER: "google/gemini-2.5-flash-lite-preview-09-2025"
 };
 // Env: OPENCLAW_REASON_STRICT_DEEPSEEK=1 → use DeepSeek V3.2 for reason_strict; else Step Flash
-function useDeepSeekForReasonStrict() {
-    const v = process.env.OPENCLAW_REASON_STRICT_DEEPSEEK || process.env.REASON_STRICT_DEEPSEEK;
-    return v === "1" || v === "true" || v === "yes";
-}
+
 class ClawRouter {
     constructor(apiKey) {
         if (!apiKey)
@@ -38,6 +38,9 @@ class ClawRouter {
         const length = text.length;
         if (length < 40)
             return "chat";
+        // Detect Vision/Image request keywords
+        if (lower.includes("image") || lower.includes("photo") || lower.includes("picture") || lower.includes("screenshot") || lower.includes("看圖") || lower.includes("分析這張"))
+            return "vision";
         if (length > 80 && /[{}\[\]]/.test(text) && lower.includes("json"))
             return "tool";
         if (length > 80 && (lower.includes("schema:") || lower.includes("schema requirement")))
@@ -68,11 +71,17 @@ class ClawRouter {
         let systemPrompt = prompts_1.PROMPT_MAIN;
         // Switch model configuration based on task type
         switch (taskType) {
+            case 'vision':
+                modelId = MODELS.VISION;
+                temperature = 0.3;
+                systemPrompt = prompts_1.PROMPT_VISION;
+                console.error(`\x1b[36m[ROUTER] Vision Mode (${modelId})...\x1b[0m`);
+                break;
             case 'reason_strict':
-                modelId = useDeepSeekForReasonStrict() ? MODELS.REASON_STRICT : MODELS.LOGIC_UNIT;
+                modelId = MODELS.REASON_STRICT;
                 temperature = 0.5;
                 systemPrompt = prompts_1.PROMPT_LOGIC;
-                console.error("\x1b[33m[ROUTER] REASON_STRICT → " + modelId + " (env OPENCLAW_REASON_STRICT_DEEPSEEK=" + (useDeepSeekForReasonStrict() ? "1" : "0") + ")\x1b[0m");
+                console.error("\x1b[33m[ROUTER] REASON_STRICT → " + modelId + "\x1b[0m");
                 break;
             case 'reason':
                 modelId = MODELS.LOGIC_UNIT;

@@ -3,7 +3,7 @@ UUZero Quant System - 完整量化交易系統
 整合 8 大模組：時序預測、均值回歸、情緒分析、組合格化、VaR風控、期權定價、多因子模型、RL交易代理
 
 Author: UUZero
-Framework: MiniMax M2.5 + DeepSeek R1
+Framework: Gemini 2.5 Flash Lite + DeepSeek R1
 """
 
 from .data_fetcher import DataFetcher

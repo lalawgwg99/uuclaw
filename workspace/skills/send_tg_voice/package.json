@@ -1,0 +1,10 @@
+{
+  "name": "send-tg-voice",
+  "version": "1.0.0",
+  "description": "直接發送語音檔案到 Telegram 的工具",
+  "main": "index.js",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "form-data": "^4.0.0"
+  }
+}
