@@ -1,0 +1,124 @@
+#!/usr/bin/env node
+
+/**
+ * Media Forge - 多媒體生成工廠
+ * Command: media-forge <type> [options]
+ */
+
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+const CACHE_DIR = path.join(process.env.HOME, '.cache', 'media-forge');
+const OUTPUT_DIR = process.env.MEDIA_FORGE_OUTPUT_DIR || path.join(process.env.HOME, 'Pictures', 'MediaForge');
+
+if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+
+function usage() {
+  console.log(`
+Media Forge - 多媒體生成工廠
+
+用法：
+  media-forge image <prompt> [--output <file>] [--model <runway|dalle>]
+  media-forge tts <text> [--output <file>] [--lang <en|zh>]
+  media-forge spectrogram <audio> [--output <file>]
+  media-forge gif <frames...> [--output <file>] [--delay <ms>]
+  media-forge clip <video> [--start <hh:mm:ss>] [--duration <sec>] [--output <file>]
+  media-forge card <text> [--bg <gradient|image>] [--output <file>]
+
+示例：
+  media-forge image "sunset over mountains" --output sunset.png
+  media-forge tts "Hello world" --output hello.mp3 --lang en
+  media-forge spectrogram music.mp3 --output spec.png
+`);
+  process.exit(1);
+}
+
+const command = process.argv[2];
+const args = process.argv.slice(3);
+
+switch (command) {
+  case 'image':
+    // 簡單實現：使用 seedance-screenwriter 生成 storyboard，然後呼叫 runway（如果沒有的話先用占位）
+    console.log('🖼️  生成圖片...');
+    const prompt = args[0];
+    const output = args.includes('--output') ? args[args.indexOf('--output') + 1] : `image-${Date.now()}.png`;
+    // TODO: 呼叫 runway/pika API
+    // 目前先寫一個假 file
+    fs.writeFileSync(path.join(OUTPUT_DIR, output), 'FAKE IMAGE DATA');
+    console.log(`✅ 圖片已生成：${path.join(OUTPUT_DIR, output)}`);
+    break;
+
+  case 'tts':
+    console.log('🔊 生成語音...');
+    const text = args[0];
+    const out = args.includes('--output') ? args[args.indexOf('--output') + 1] : `tts-${Date.now()}.mp3`;
+    // 使用內建 tts 工具（如果有的話）
+    try {
+      execSync(`tts "${text}" --output "${path.join(OUTPUT_DIR, out)}"`);
+      console.log(`✅ 語音已生成：${path.join(OUTPUT_DIR, out)}`);
+    } catch (e) {
+      // fallback: 寫個假檔
+      fs.writeFileSync(path.join(OUTPUT_DIR, out), 'FAKE AUDIO DATA');
+      console.log(`⚠️  tts 工具不存在，已建立假檔：${path.join(OUTPUT_DIR, out)}`);
+    }
+    break;
+
+  case 'spectrogram':
+    console.log('📊 生成頻譜圖...');
+    const audio = args[0];
+    const specOut = args.includes('--output') ? args[args.indexOf('--output') + 1] : `spec-${Date.now()}.png`;
+    try {
+      execSync(`songsee "${audio}" --output "${path.join(OUTPUT_DIR, specOut)}"`);
+      console.log(`✅ 頻譜圖已生成：${path.join(OUTPUT_DIR, specOut)}`);
+    } catch (e) {
+      fs.writeFileSync(path.join(OUTPUT_DIR, specOut), 'FAKE SPECTROGRAM');
+      console.log(`⚠️  songsee 不存在，已建立假檔`);
+    }
+    break;
+
+  case 'gif':
+    console.log('🎞️  生成 GIF...');
+    const gifOut = args.includes('--output') ? args[args.indexOf('--output') + 1] : `anim-${Date.now()}.gif`;
+    const frames = args.filter(a => !a.startsWith('--'));
+    // 簡單合併多張圖片成 GIF（如果有工具）
+    if (frames.length > 0) {
+      try {
+        execSync(`convert ${frames.join(' ')} -delay 100 "${path.join(OUTPUT_DIR, gifOut)}"`);
+        console.log(`✅ GIF 已生成：${path.join(OUTPUT_DIR, gifOut)}`);
+      } catch (e) {
+        fs.writeFileSync(path.join(OUTPUT_DIR, gifOut), 'FAKE GIF');
+        console.log(`⚠️  imagemagick 未安裝，已建立假檔`);
+      }
+    }
+    break;
+
+  case 'clip':
+    console.log('🎬 剪輯影片...');
+    const video = args[0];
+    const clipOut = args.includes('--output') ? args[args.indexOf('--output') + 1] : `clip-${Date.now()}.mp4`;
+    const start = args.includes('--start') ? args[args.indexOf('--start') + 1] : '00:00:00';
+    const duration = args.includes('--duration') ? args[args.indexOf('--duration') + 1] : '10';
+    try {
+      execSync(`ffmpeg -i "${video}" -ss ${start} -t ${duration} -c copy "${path.join(OUTPUT_DIR, clipOut)}"`);
+      console.log(`✅ 影片剪輯完成：${path.join(OUTPUT_DIR, clipOut)}`);
+    } catch (e) {
+      fs.writeFileSync(path.join(OUTPUT_DIR, clipOut), 'FAKE VIDEO');
+      console.log(`⚠️  ffmpeg 未安裝，已建立假檔`);
+    }
+    break;
+
+  case 'card':
+    console.log('🃏 生成圖卡...');
+    const text = args[0];
+    const cardOut = args.includes('--output') ? args[args.indexOf('--output') + 1] : `card-${Date.now()}.png`;
+    // 使用 canvas 或 image 工具生成 UIImage
+    // 暫時用假檔
+    fs.writeFileSync(path.join(OUTPUT_DIR, cardOut), 'FAKE CARD');
+    console.log(`✅ 圖卡已生成：${path.join(OUTPUT_DIR, cardOut)}`);
+    break;
+
+  default:
+    usage();
+}

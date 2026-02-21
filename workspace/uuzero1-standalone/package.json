@@ -1,0 +1,63 @@
+{
+  "name": "uuzero",
+  "version": "1.0.0",
+  "description": "UUZero Standalone Sovereign Agent - Independent AI agent with multi-model routing",
+  "main": "index.js",
+  "type": "commonjs",
+  "bin": {
+    "uuzero-skill": "./index.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "stop": "pkill -f \"node server.js\" || true",
+    "cli": "node standalone.js",
+    "debug": "node autodebug.js",
+    "validate": "node validate.js",
+    "install:all": "npm install && cd modules/router && npm install",
+    "test": "node index.js status",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "openclaw",
+    "uuzero",
+    "sovereign-agent",
+    "ai",
+    "router",
+    "openrouter"
+  ],
+  "author": "UUZero (for JazzX)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lalawgwg99/uuzero1.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "openai": "^6.22.0",
+    "dotenv": "^17.3.1",
+    "ws": "^8.19.0"
+  },
+  "openclaw": {
+    "skillId": "uuzero-standalone",
+    "minOpenClawVersion": "1.0.0",
+    "category": "agents",
+    "tags": ["ai", "sovereign", "router", "openrouter", "standalone"],
+    "permissions": [
+      "network:outbound",
+      "process:spawn",
+      "filesystem:read",
+      "filesystem:write"
+    ],
+    "defaultModel": "stepfun/step-3.5-flash:free",
+    "entrypoint": "index.js",
+    "autoStart": false,
+    "healthCheck": {
+      "type": "http",
+      "url": "http://localhost:3000/health",
+      "intervalSec": 30
+    }
+  }
+}

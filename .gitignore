@@ -1,10 +1,17 @@
-# OpenClaw local state & secrets (do not commit)
-.openclaw/
+# =============================================
+# OpenClaw — .gitignore
+# =============================================
+
+# 🔐 Secrets & Config (NEVER commit API keys)
 openclaw.json
 openclaw.json.bak*
+*.backup-*
 .env
 .env.*
 !.env.example
+
+# OpenClaw local runtime state
+.openclaw/
 
 # Dependencies
 node_modules/
@@ -12,6 +19,15 @@ node_modules/
 # Logs & temp
 *.log
 .DS_Store
+Thumbs.db
 
-# Optional: uncomment if you don't want to share workspace content
-# workspace/
+# macOS
+.AppleDouble
+.LSOverride
+
+# Archives (optional: uncomment to exclude old backups)
+# archive/
+workspace/agent-architect-protocol/
+workspace/temp-router-source/
+workspace/uuzero1/
+workspace/workspace/

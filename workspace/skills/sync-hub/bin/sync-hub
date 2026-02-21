@@ -1,0 +1,4 @@
+#!/bin/zsh
+# Wrapper for Sync Hub (Node ESM)
+DIR="$(cd "$(dirname "$0")" && pwd)"
+exec node "$DIR/../index.js" "$@"

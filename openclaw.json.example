@@ -1,0 +1,40 @@
+{
+  "_comment": "這是範本檔。請複製為 openclaw.json 並填入你自己的 API Key。",
+  "defaults": {
+    "model": {
+      "primary": "openrouter/YOUR_MODEL_HERE",
+      "apiBase": "https://openrouter.ai/api/v1",
+      "apiKey": "sk-or-v1-YOUR_API_KEY_HERE"
+    }
+  },
+  "agents": {
+    "list": [
+      {
+        "id": "main",
+        "workspace": "./workspace"
+      },
+      {
+        "id": "molt",
+        "workspace": "./workspace-molt"
+      },
+      {
+        "id": "wei",
+        "workspace": "./workspace-wei"
+      },
+      {
+        "id": "you",
+        "workspace": "./workspace-you"
+      }
+    ]
+  },
+  "channels": {
+    "telegram": {
+      "accounts": {
+        "default": { "token": "YOUR_TELEGRAM_BOT_TOKEN_HERE" },
+        "molt":    { "token": "YOUR_TELEGRAM_BOT_TOKEN_HERE" },
+        "wei":     { "token": "YOUR_TELEGRAM_BOT_TOKEN_HERE" },
+        "you":     { "token": "YOUR_TELEGRAM_BOT_TOKEN_HERE" }
+      }
+    }
+  }
+}
