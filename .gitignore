@@ -31,3 +31,4 @@ workspace/agent-architect-protocol/
 workspace/temp-router-source/
 workspace/uuzero1/
 workspace/workspace/
+.venv/
