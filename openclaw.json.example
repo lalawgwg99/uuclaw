@@ -24,6 +24,10 @@
       {
         "id": "you",
         "workspace": "./workspace-you"
+      },
+      {
+        "id": "baba",
+        "workspace": "./workspace-baba"
       }
     ]
   },
@@ -33,7 +37,8 @@
         "default": { "token": "YOUR_TELEGRAM_BOT_TOKEN_HERE" },
         "molt":    { "token": "YOUR_TELEGRAM_BOT_TOKEN_HERE" },
         "wei":     { "token": "YOUR_TELEGRAM_BOT_TOKEN_HERE" },
-        "you":     { "token": "YOUR_TELEGRAM_BOT_TOKEN_HERE" }
+        "you":     { "token": "YOUR_TELEGRAM_BOT_TOKEN_HERE" },
+        "baba":    { "token": "YOUR_TELEGRAM_BOT_TOKEN_HERE" }
       }
     }
   }
